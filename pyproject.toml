@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "cc-provenance"
+name = "nautobot-cc-provenance"
 version = "0.1.0"
 description = "Explains which config context supplied each key of a merged config context."
 authors = ["Network to Code, LLC <info@networktocode.com>"]

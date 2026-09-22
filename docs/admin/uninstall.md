@@ -17,5 +17,5 @@ Remove the configuration you added in `nautobot_config.py` from `PLUGINS` & `PLU
 ## Uninstall the package
 
 ```bash
-$ pip3 uninstall cc-provenance
+$ pip3 uninstall nautobot-cc-provenance
 ```

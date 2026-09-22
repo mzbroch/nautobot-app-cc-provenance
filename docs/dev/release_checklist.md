@@ -65,7 +65,7 @@ Display the current version with no arguments:
 
 ```no-highlight
 > poetry version
-cc-provenance 1.0.0-beta.2
+nautobot-cc-provenance 1.0.0-beta.2
 ```
 
 Bump pre-release versions using `prerelease`:
