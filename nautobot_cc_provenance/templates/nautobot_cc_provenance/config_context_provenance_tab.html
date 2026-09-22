@@ -1,0 +1,149 @@
+{% extends base_template %}
+{% load helpers %}
+
+{% block content %}
+  {% if not result.is_trustworthy %}
+    <div class="panel panel-danger">
+      <div class="panel-heading">
+        <strong>Provenance unavailable</strong>
+      </div>
+      <div class="panel-body">
+        <p>
+          The replayed merge did not reproduce this object's config context, so no
+          attribution is shown. Reporting a source that may be wrong would send you
+          to edit the wrong object.
+        </p>
+        <p><strong>Diverging paths</strong></p>
+        <ul>
+          {% for path in result.diverging_paths %}
+            <li><code>{{ path }}</code></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  {% else %}
+    <div class="panel panel-default">
+      <div class="panel-heading clearfix">
+        <strong>Config Context Provenance</strong>
+        <span class="pull-right text-muted">
+          {{ result.candidate_contexts }} context{{ result.candidate_contexts|pluralize }} applied
+          {% if result.has_local_data %}&middot; local data present{% endif %}
+        </span>
+      </div>
+
+      <div class="panel-body">
+        <form method="get" class="form-inline" role="search">
+          <div class="btn-group" role="group">
+            <a href="?" class="btn btn-default {% if not conflicts_only %}active{% endif %}">
+              All paths <span class="badge">{{ total_paths }}</span>
+            </a>
+            <a href="?conflicts_only=true" class="btn btn-default {% if conflicts_only %}active{% endif %}">
+              Conflicts only <span class="badge">{{ result.conflict_count }}</span>
+            </a>
+          </div>
+          {% if conflicts_only %}
+            <input type="hidden" name="conflicts_only" value="true">
+          {% endif %}
+          <div class="form-group">
+            <label class="sr-only" for="provenance-q">Filter paths</label>
+            <input type="text" class="form-control" id="provenance-q" name="q"
+                   value="{{ search_query }}" placeholder="filter paths&hellip;">
+          </div>
+          <button type="submit" class="btn btn-primary">Filter</button>
+        </form>
+      </div>
+
+      <table class="table table-hover panel-body attr-table">
+        <thead>
+          <tr>
+            <th scope="col">Path</th>
+            <th scope="col">Value</th>
+            <th scope="col">Source</th>
+            <th scope="col" class="text-right">Weight</th>
+            <th scope="col" class="text-right">Shadowed</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for record in records %}
+            <tr>
+              <td>
+                <code>{{ record.path }}</code>
+                {% if record.is_list %}
+                  <span class="label label-default" title="Deep merge replaces lists wholesale">list</span>
+                {% endif %}
+              </td>
+              <td><code>{{ record.value_display }}</code></td>
+              <td>
+                {% if record.source.restricted %}
+                  <span class="text-muted"><em>{{ record.source.name }}</em></span>
+                {% elif record.source.is_local %}
+                  {{ record.source.name }}
+                {% else %}
+                  {{ record.source.name }}
+                  {% if record.source.owner %}
+                    <br><small class="text-muted">{{ record.source.owner }}</small>
+                  {% endif %}
+                {% endif %}
+              </td>
+              <td class="text-right">
+                {% if record.source.weight is not None %}{{ record.source.weight }}{% else %}&mdash;{% endif %}
+              </td>
+              <td class="text-right">
+                {% if record.is_conflicted %}
+                  <button type="button" class="btn btn-xs btn-warning" data-toggle="collapse"
+                          data-target="#shadowed-{{ forloop.counter }}"
+                          aria-expanded="false" aria-controls="shadowed-{{ forloop.counter }}">
+                    {{ record.shadowed|length }}
+                  </button>
+                {% else %}
+                  <span class="text-muted">0</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% if record.is_conflicted %}
+              <tr>
+                <td colspan="5" class="collapse" id="shadowed-{{ forloop.counter }}">
+                  <strong class="text-muted">Shadowed at this path</strong>
+                  <table class="table table-condensed">
+                    <tbody>
+                      {% for entry in record.shadowed %}
+                        <tr>
+                          <td><code>{{ entry.path }}</code></td>
+                          <td><code>{{ entry.value }}</code></td>
+                          <td>
+                            {% if entry.source.restricted %}
+                              <span class="text-muted"><em>{{ entry.source.name }}</em></span>
+                            {% else %}
+                              {{ entry.source.name }}
+                            {% endif %}
+                          </td>
+                          <td class="text-right">
+                            {% if entry.source.weight is not None %}
+                              weight {{ entry.source.weight }}
+                            {% else %}
+                              &mdash;
+                            {% endif %}
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            {% endif %}
+          {% empty %}
+            <tr>
+              <td colspan="5" class="text-muted">
+                {% if total_paths %}
+                  No paths match the current filter.
+                {% else %}
+                  No config context applies to this object.
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+{% endblock %}
