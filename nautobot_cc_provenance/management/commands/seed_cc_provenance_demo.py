@@ -230,43 +230,40 @@ class Command(BaseCommand):
         location_status = Status.objects.get_for_model(Location).get(name="Active")
         device_status = Status.objects.get_for_model(Device).get(name="Active")
 
-        region_type = self._ensure(LocationType, name=REGION_TYPE, defaults={"nestable": True})
-        site_type = self._ensure(LocationType, name=SITE_TYPE, defaults={"parent": region_type})
+        region_type = self._ensure(LocationType, {"nestable": True}, name=REGION_TYPE)
+        site_type = self._ensure(LocationType, {"parent": region_type}, name=SITE_TYPE)
         site_type.content_types.add(device_ct)
 
         regions = {
             name: self._ensure(
                 Location,
+                {"location_type": region_type, "status": location_status},
                 name=name,
-                defaults={"location_type": region_type, "status": location_status},
             )
             for name in REGIONS
         }
         sites = {
             name: self._ensure(
                 Location,
-                name=name,
-                defaults={
+                {
                     "location_type": site_type,
                     "status": location_status,
                     "parent": regions[parent],
                 },
+                name=name,
             )
             for name, parent in SITES.items()
         }
 
         manufacturer = self._ensure(Manufacturer, name=MANUFACTURER)
         device_types = {
-            model: self._ensure(DeviceType, model=model, defaults={"manufacturer": manufacturer})
-            for model in DEVICE_TYPES
+            model: self._ensure(DeviceType, {"manufacturer": manufacturer}, model=model) for model in DEVICE_TYPES
         }
-        platforms = {
-            name: self._ensure(Platform, name=name, defaults={"manufacturer": manufacturer}) for name in PLATFORMS
-        }
+        platforms = {name: self._ensure(Platform, {"manufacturer": manufacturer}, name=name) for name in PLATFORMS}
 
         roles = {}
         for name in ROLES:
-            role = self._ensure(Role, name=name, defaults={"color": "0f7c80"})
+            role = self._ensure(Role, {"color": "0f7c80"}, name=name)
             role.content_types.add(device_ct)
             roles[name] = role
 
@@ -276,8 +273,7 @@ class Command(BaseCommand):
         for entry in DEVICES:
             device = self._ensure(
                 Device,
-                name=entry["name"],
-                defaults={
+                {
                     "location": sites[entry["site"]],
                     "role": roles[entry["role"]],
                     "device_type": device_types[entry["device_type"]],
@@ -285,6 +281,7 @@ class Command(BaseCommand):
                     "status": device_status,
                     "tenant": tenant if entry["tenant"] else None,
                 },
+                name=entry["name"],
             )
             if entry["local_config_context_data"] and not device.local_config_context_data:
                 device.local_config_context_data = entry["local_config_context_data"]
@@ -300,23 +297,27 @@ class Command(BaseCommand):
         for entry in CONFIG_CONTEXTS:
             context = self._ensure(
                 ConfigContext,
+                {"weight": entry["weight"], "data": entry["data"]},
                 name=entry["name"],
-                defaults={"weight": entry["weight"], "data": entry["data"]},
             )
             for field, keys in entry["scope"].items():
                 getattr(context, field).set([scope_sources[field][key] for key in keys])
 
         self._report(devices)
 
-    def _ensure(self, model, defaults=None, **lookup):
-        """Return the existing object matching `lookup`, or create it with `defaults`."""
-        existing = model.objects.filter(**lookup).first()
+    def _ensure(self, model_class, defaults=None, /, **lookup):
+        """Return the existing object matching `lookup`, or create it with `defaults`.
+
+        Both parameters are positional-only so that a lookup field may be named
+        `model`, as `DeviceType.model` is.
+        """
+        existing = model_class.objects.filter(**lookup).first()
         if existing is not None:
             return existing
 
-        obj = model(**lookup, **(defaults or {}))
+        obj = model_class(**lookup, **(defaults or {}))
         obj.validated_save()
-        self.stdout.write(f"  created {model._meta.verbose_name}: {obj}")
+        self.stdout.write(f"  created {model_class._meta.verbose_name}: {obj}")
         return obj
 
     def _report(self, devices):
